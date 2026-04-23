@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Flappy Brainrots</title>
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        background: linear-gradient(120deg, #111, #222);
+        font-family: Arial, sans-serif;
+        color: white;
+    }
+
+    canvas {
+        display: block;
+        margin: 0 auto;
+        background: linear-gradient(to bottom, #4ec0ca, #1e90ff);
+    }
+
+    #menu, #gameOver, #shop {
+        position: absolute;
+        inset: 0;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        background: rgba(0,0,0,0.7);
+        backdrop-filter: blur(6px);
+    }
+
+    #menu { display: flex; }
+
+    button {
+        padding: 12px 20px;
+        margin: 5px;
+        font-size: 18px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        background: lime;
+        font-weight: bold;
+    }
+
+    button:hover { transform: scale(1.05); }
+
+    #scoreUI {
+        position: absolute;
+        top: 15px;
+        left: 15px;
+        font-size: 20px;
+    }
+
+    #shopList button {
+        width: 200px;
+    }
+
+    .locked {
+        background: #444;
+        color: #999;
+    }
+</style>
+</head>
+<body>
+
+<canvas id="game" width="400" height="600"></canvas>
+
+<div id="menu">
+    <h1>💀 Flappy Brainrots</h1>
+    <button onclick="startGame()">Start</button>
+    <button onclick="openShop()">Shop 🛒</button>
+</div>
+
+<div id="gameOver">
+    <h1>Game Over</h1>
+    <p id="finalScore"></p>
+    <p id="bestScore"></p>
+    <button onclick="startGame()">Retry</button>
+    <button onclick="openShop()">Shop 🛒</button>
+</div>
+
+<div id="shop">
+    <h1>Brainrot Shop 🛒</h1>
+    <p id="coinsUI"></p>
+    <div id="shopList"></div>
+    <button onclick="closeShop()">Close</button>
+</div>
+
+<div id="scoreUI">Score: 0</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let bird, gravity, velocity, pipes, score, gameRunning, coins;
+
+const skins = [
+    { name: "Default Skull", icon: "💀", cost: 0 },
+    { name: "Brainrot", icon: "🧠", cost: 5 },
+    { name: "Clown Core", icon: "🤡", cost: 10 },
+    { name: "Alien Rot", icon: "👽", cost: 15 },
+    { name: "Goblin", icon: "👺", cost: 20 },
+    { name: "Robot Rot", icon: "🤖", cost: 25 },
+    { name: "Frog Mode", icon: "🐸", cost: 30 }
+];
+
+let unlocked = JSON.parse(localStorage.getItem("unlocked")) || ["Default Skull"];
+let selectedSkin = localStorage.getItem("selectedSkin") || "Default Skull";
+let bestScore = localStorage.getItem("bestScore") || 0;
+
+function reset() {
+    bird = {
+        x: 80,
+        y: 200,
+        size: 30,
+        icon: skins.find(s => s.name === selectedSkin).icon
+    };
+
+    gravity = 0.5;
+    velocity = 0;
+    pipes = [];
+    score = 0;
+    gameRunning = true;
+    coins = 0;
+
+    document.getElementById("scoreUI").innerText = "Score: 0";
+}
+
+function startGame() {
+    document.getElementById("menu").style.display = "none";
+    document.getElementById("gameOver").style.display = "none";
+    document.getElementById("shop").style.display = "none";
+    reset();
+    loop();
+}
+
+function openShop() {
+    document.getElementById("shop").style.display = "flex";
+    renderShop();
+}
+
+function closeShop() {
+    document.getElementById("shop").style.display = "none";
+}
+
+function renderShop() {
+    document.getElementById("coinsUI").innerText = "Coins: " + coins;
+
+    const list = document.getElementById("shopList");
+    list.innerHTML = "";
+
+    skins.forEach(skin => {
+        let owned = unlocked.includes(skin.name);
+
+        let btn = document.createElement("button");
+        btn.innerText = `${skin.icon} ${skin.name} - ${skin.cost}`;
+
+        if (!owned) btn.classList.add("locked");
+
+        btn.onclick = () => {
+            if (!owned && coins >= skin.cost) {
+                coins -= skin.cost;
+                unlocked.push(skin.name);
+                localStorage.setItem("unlocked", JSON.stringify(unlocked));
+            }
+
+            if (unlocked.includes(skin.name)) {
+                selectedSkin = skin.name;
+                localStorage.setItem("selectedSkin", selectedSkin);
+                bird.icon = skin.icon;
+            }
+
+            renderShop();
+        };
+
+        list.appendChild(btn);
+    });
+}
+
+document.addEventListener("keydown", () => {
+    if (gameRunning) velocity = -8;
+});
+
+document.addEventListener("click", () => {
+    if (gameRunning) velocity = -8;
+});
+
+function createPipe() {
+    let gap = 140;
+    let top = Math.random() * (canvas.height - gap - 100) + 50;
+    pipes.push({ x: canvas.width, top, gap });
+}
+
+function drawBird() {
+    ctx.font = "30px Arial";
+    ctx.fillText(bird.icon, bird.x, bird.y);
+}
+
+function drawPipes() {
+    ctx.fillStyle = "green";
+    pipes.forEach(p => {
+        ctx.fillRect(p.x, 0, 60, p.top);
+        ctx.fillRect(p.x, p.top + p.gap, 60, canvas.height);
+    });
+}
+
+function update() {
+    velocity += gravity;
+    bird.y += velocity;
+
+    if (pipes.length === 0 || pipes[pipes.length - 1].x < 250) {
+        createPipe();
+    }
+
+    pipes.forEach(p => {
+        p.x -= 3;
+
+        if (!p.passed && p.x + 60 < bird.x) {
+            score++;
+            coins++;
+            p.passed = true;
+            document.getElementById("scoreUI").innerText = "Score: " + score;
+        }
+
+        if (
+            bird.x < p.x + 60 &&
+            bird.x + 30 > p.x &&
+            (bird.y < p.top || bird.y > p.top + p.gap)
+        ) {
+            endGame();
+        }
+    });
+
+    pipes = pipes.filter(p => p.x > -100);
+
+    if (bird.y > canvas.height || bird.y < 0) {
+        endGame();
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawPipes();
+    drawBird();
+}
+
+function loop() {
+    if (!gameRunning) return;
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+function endGame() {
+    gameRunning = false;
+
+    if (score > bestScore) {
+        bestScore = score;
+        localStorage.setItem("bestScore", bestScore);
+    }
+
+    document.getElementById("finalScore").innerText = "Score: " + score;
+    document.getElementById("bestScore").innerText = "Best: " + bestScore;
+
+    document.getElementById("gameOver").style.display = "flex";
+}
+</script>
+
+</body>
+</html>
