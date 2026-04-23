@@ -1,69 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>Flappy Brainrots</title>
+
 <style>
-    body {
-        margin: 0;
-        overflow: hidden;
-        background: linear-gradient(120deg, #111, #222);
-        font-family: Arial, sans-serif;
-        color: white;
-    }
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: Arial;
+    background: black;
+}
 
-    canvas {
-        display: block;
-        margin: 0 auto;
-        background: linear-gradient(to bottom, #4ec0ca, #1e90ff);
-    }
+canvas {
+    display: block;
+    margin: 0 auto;
+}
 
-    #menu, #gameOver, #shop {
-        position: absolute;
-        inset: 0;
-        display: none;
-        justify-content: center;
-        align-items: center;
-        flex-direction: column;
-        background: rgba(0,0,0,0.7);
-        backdrop-filter: blur(6px);
-    }
+.ui {
+    position: absolute;
+    color: white;
+    font-size: 28px;
+    text-shadow: 0 0 10px black;
+}
 
-    #menu { display: flex; }
+#score {
+    top: 20px;
+    left: 20px;
+}
 
-    button {
-        padding: 12px 20px;
-        margin: 5px;
-        font-size: 18px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        background: lime;
-        font-weight: bold;
-    }
+#menu, #gameOver, #shop {
+    position: absolute;
+    inset: 0;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(10px);
+    color: white;
+}
 
-    button:hover { transform: scale(1.05); }
+#menu { display: flex; }
 
-    #scoreUI {
-        position: absolute;
-        top: 15px;
-        left: 15px;
-        font-size: 20px;
-    }
+button {
+    padding: 15px 30px;
+    font-size: 18px;
+    border: none;
+    margin: 10px;
+    cursor: pointer;
+    background: linear-gradient(90deg, #ff00ff, #00ffff);
+    color: black;
+    font-weight: bold;
+    border-radius: 10px;
+}
 
-    #shopList button {
-        width: 200px;
-    }
+button:hover {
+    transform: scale(1.1);
+}
 
-    .locked {
-        background: #444;
-        color: #999;
-    }
+#bg {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(#050014, #000);
+}
+
 </style>
 </head>
+
 <body>
 
-<canvas id="game" width="400" height="600"></canvas>
+<div id="bg"></div>
+
+<canvas id="game" width="500" height="700"></canvas>
+
+<div id="score" class="ui">Score: 0</div>
 
 <div id="menu">
     <h1>💀 Flappy Brainrots</h1>
@@ -73,59 +85,83 @@
 
 <div id="gameOver">
     <h1>Game Over</h1>
-    <p id="finalScore"></p>
-    <p id="bestScore"></p>
+    <p id="final"></p>
+    <p id="best"></p>
     <button onclick="startGame()">Retry</button>
     <button onclick="openShop()">Shop 🛒</button>
 </div>
 
 <div id="shop">
-    <h1>Brainrot Shop 🛒</h1>
-    <p id="coinsUI"></p>
-    <div id="shopList"></div>
+    <h1>Brainrot Shop</h1>
+    <p id="coins"></p>
+    <div id="list"></div>
     <button onclick="closeShop()">Close</button>
 </div>
-
-<div id="scoreUI">Score: 0</div>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let bird, gravity, velocity, pipes, score, gameRunning, coins;
-
+/* =======================
+   🧠 SKINS (FIXED)
+======================= */
 const skins = [
-    { name: "Default Skull", icon: "💀", cost: 0 },
-    { name: "Brainrot", icon: "🧠", cost: 5 },
-    { name: "Clown Core", icon: "🤡", cost: 10 },
-    { name: "Alien Rot", icon: "👽", cost: 15 },
-    { name: "Goblin", icon: "👺", cost: 20 },
-    { name: "Robot Rot", icon: "🤖", cost: 25 },
-    { name: "Frog Mode", icon: "🐸", cost: 30 }
+    { name: "Tungtung Sahur", img: "skins/tungtungsahur.png", unlock: 0 }
 ];
 
-let unlocked = JSON.parse(localStorage.getItem("unlocked")) || ["Default Skull"];
-let selectedSkin = localStorage.getItem("selectedSkin") || "Default Skull";
-let bestScore = localStorage.getItem("bestScore") || 0;
+/* =======================
+   💾 SAVE SYSTEM (FIXED DEFAULTS)
+======================= */
+let owned = JSON.parse(localStorage.getItem("owned")) || ["Tungtung Sahur"];
+let equipped = localStorage.getItem("equipped") || "Tungtung Sahur";
+let best = Number(localStorage.getItem("best")) || 0;
 
+/* =======================
+   GAME STATE
+======================= */
+let bird, pipes, score, coins;
+let velocity, gravity;
+let running = false;
+
+/* =======================
+   INIT
+======================= */
 function reset() {
     bird = {
-        x: 80,
+        x: 100,
         y: 200,
-        size: 30,
-        icon: skins.find(s => s.name === selectedSkin).icon
+        img: new Image()
     };
 
-    gravity = 0.5;
-    velocity = 0;
+    setSkin(equipped);
+
     pipes = [];
     score = 0;
-    gameRunning = true;
     coins = 0;
+    gravity = 0.5;
+    velocity = 0;
+    running = true;
 
-    document.getElementById("scoreUI").innerText = "Score: 0";
+    document.getElementById("score").innerText = "Score: 0";
 }
 
+/* =======================
+   SKIN EQUIP
+======================= */
+function setSkin(name) {
+    const skin = skins.find(s => s.name === name);
+    if (!skin) return;
+
+    bird.img = new Image();
+    bird.img.src = skin.img;
+
+    equipped = name;
+    localStorage.setItem("equipped", name);
+}
+
+/* =======================
+   START GAME
+======================= */
 function startGame() {
     document.getElementById("menu").style.display = "none";
     document.getElementById("gameOver").style.display = "none";
@@ -134,135 +170,127 @@ function startGame() {
     loop();
 }
 
+/* =======================
+   INPUT
+======================= */
+document.addEventListener("click", () => {
+    if (running) velocity = -8;
+});
+
+/* =======================
+   PIPES
+======================= */
+function pipe() {
+    let gap = 160;
+    let top = Math.random() * 300 + 100;
+    pipes.push({ x: canvas.width, top, gap, passed: false });
+}
+
+/* =======================
+   UPDATE
+======================= */
+function update() {
+    velocity += gravity;
+    bird.y += velocity;
+
+    if (pipes.length === 0 || pipes[pipes.length - 1].x < 250) pipe();
+
+    pipes.forEach(p => {
+        p.x -= 3;
+
+        if (!p.passed && p.x < bird.x) {
+            score++;
+            coins++;
+            p.passed = true;
+            document.getElementById("score").innerText = "Score: " + score;
+        }
+
+        if (
+            bird.x < p.x + 60 &&
+            bird.x + 50 > p.x &&
+            (bird.y < p.top || bird.y > p.top + p.gap)
+        ) end();
+    });
+
+    pipes = pipes.filter(p => p.x > -100);
+
+    if (bird.y > canvas.height || bird.y < 0) end();
+}
+
+/* =======================
+   DRAW
+======================= */
+function draw() {
+    ctx.fillStyle = "#050014";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#00ffff";
+    pipes.forEach(p => {
+        ctx.fillRect(p.x, 0, 60, p.top);
+        ctx.fillRect(p.x, p.top + p.gap, 60, canvas.height);
+    });
+
+    ctx.drawImage(bird.img, bird.x, bird.y, 50, 50);
+}
+
+/* =======================
+   LOOP
+======================= */
+function loop() {
+    if (!running) return;
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+/* =======================
+   GAME OVER (FIXED BEST SAVE)
+======================= */
+function end() {
+    running = false;
+
+    if (score > best) {
+        best = score;
+        localStorage.setItem("best", best);
+    }
+
+    document.getElementById("final").innerText = "Score: " + score;
+    document.getElementById("best").innerText = "Best: " + best;
+    document.getElementById("gameOver").style.display = "flex";
+}
+
+/* =======================
+   SHOP
+======================= */
 function openShop() {
     document.getElementById("shop").style.display = "flex";
-    renderShop();
-}
 
-function closeShop() {
-    document.getElementById("shop").style.display = "none";
-}
-
-function renderShop() {
-    document.getElementById("coinsUI").innerText = "Coins: " + coins;
-
-    const list = document.getElementById("shopList");
+    let list = document.getElementById("list");
     list.innerHTML = "";
 
-    skins.forEach(skin => {
-        let owned = unlocked.includes(skin.name);
+    document.getElementById("coins").innerText = "Best Score: " + best;
 
+    skins.forEach(s => {
         let btn = document.createElement("button");
-        btn.innerText = `${skin.icon} ${skin.name} - ${skin.cost}`;
 
-        if (!owned) btn.classList.add("locked");
+        let unlocked = owned.includes(s.name);
+
+        btn.innerText = unlocked
+            ? "Equip " + s.name
+            : "Locked (Need " + s.unlock + " score)";
+
+        if (!unlocked) btn.disabled = true;
 
         btn.onclick = () => {
-            if (!owned && coins >= skin.cost) {
-                coins -= skin.cost;
-                unlocked.push(skin.name);
-                localStorage.setItem("unlocked", JSON.stringify(unlocked));
-            }
-
-            if (unlocked.includes(skin.name)) {
-                selectedSkin = skin.name;
-                localStorage.setItem("selectedSkin", selectedSkin);
-                bird.icon = skin.icon;
-            }
-
-            renderShop();
+            setSkin(s.name);
         };
 
         list.appendChild(btn);
     });
 }
 
-document.addEventListener("keydown", () => {
-    if (gameRunning) velocity = -8;
-});
-
-document.addEventListener("click", () => {
-    if (gameRunning) velocity = -8;
-});
-
-function createPipe() {
-    let gap = 140;
-    let top = Math.random() * (canvas.height - gap - 100) + 50;
-    pipes.push({ x: canvas.width, top, gap });
-}
-
-function drawBird() {
-    ctx.font = "30px Arial";
-    ctx.fillText(bird.icon, bird.x, bird.y);
-}
-
-function drawPipes() {
-    ctx.fillStyle = "green";
-    pipes.forEach(p => {
-        ctx.fillRect(p.x, 0, 60, p.top);
-        ctx.fillRect(p.x, p.top + p.gap, 60, canvas.height);
-    });
-}
-
-function update() {
-    velocity += gravity;
-    bird.y += velocity;
-
-    if (pipes.length === 0 || pipes[pipes.length - 1].x < 250) {
-        createPipe();
-    }
-
-    pipes.forEach(p => {
-        p.x -= 3;
-
-        if (!p.passed && p.x + 60 < bird.x) {
-            score++;
-            coins++;
-            p.passed = true;
-            document.getElementById("scoreUI").innerText = "Score: " + score;
-        }
-
-        if (
-            bird.x < p.x + 60 &&
-            bird.x + 30 > p.x &&
-            (bird.y < p.top || bird.y > p.top + p.gap)
-        ) {
-            endGame();
-        }
-    });
-
-    pipes = pipes.filter(p => p.x > -100);
-
-    if (bird.y > canvas.height || bird.y < 0) {
-        endGame();
-    }
-}
-
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawPipes();
-    drawBird();
-}
-
-function loop() {
-    if (!gameRunning) return;
-    update();
-    draw();
-    requestAnimationFrame(loop);
-}
-
-function endGame() {
-    gameRunning = false;
-
-    if (score > bestScore) {
-        bestScore = score;
-        localStorage.setItem("bestScore", bestScore);
-    }
-
-    document.getElementById("finalScore").innerText = "Score: " + score;
-    document.getElementById("bestScore").innerText = "Best: " + bestScore;
-
-    document.getElementById("gameOver").style.display = "flex";
+function closeShop() {
+    document.getElementById("shop").style.display = "none";
 }
 </script>
 
