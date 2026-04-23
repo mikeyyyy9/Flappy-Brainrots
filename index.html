@@ -3,34 +3,96 @@
 <head>
 <meta charset="UTF-8">
 <title>Flappy Brainrots</title>
+
 <style>
 body {
     margin: 0;
-    background: black;
     overflow: hidden;
-    font-family: Arial;
-    color: white;
+    font-family: Arial, sans-serif;
+    background: black;
 }
 
+/* CANVAS */
 canvas {
     display: block;
     margin: 0 auto;
-    background: linear-gradient(#12002b, #000);
+    background: linear-gradient(#0a001a, #000);
 }
 
-#ui {
+/* TOP SCORE UI (PRO STYLE) */
+#score {
     position: absolute;
-    top: 20px;
-    left: 20px;
-    font-size: 24px;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 28px;
+    color: white;
+    text-shadow: 0 0 15px #00ffff;
+}
+
+/* MENU OVERLAY */
+.overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(8px);
+}
+
+/* TITLE */
+h1 {
+    color: white;
+    font-size: 42px;
+    text-shadow: 0 0 20px #ff00ff;
+    margin-bottom: 20px;
+}
+
+/* BUTTONS */
+button {
+    padding: 14px 28px;
+    margin: 8px;
+    font-size: 18px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: bold;
+    background: linear-gradient(90deg, #ff00ff, #00ffff);
+    color: black;
+    transition: 0.2s;
+}
+
+button:hover {
+    transform: scale(1.08);
+}
+
+/* GAME OVER TEXT */
+#gameOver {
+    display: none;
+    color: white;
 }
 </style>
 </head>
 
 <body>
 
-<div id="ui">Score: 0</div>
-<canvas id="game" width="500" height="700"></canvas>
+<div id="score">Score: 0</div>
+<canvas id="game" width="420" height="700"></canvas>
+
+<!-- MENU -->
+<div id="menu" class="overlay">
+    <h1>💀 Flappy Brainrots</h1>
+    <button onclick="startGame()">Play</button>
+</div>
+
+<!-- GAME OVER -->
+<div id="gameOver" class="overlay">
+    <h1>Game Over</h1>
+    <p id="finalScore"></p>
+    <button onclick="startGame()">Retry</button>
+</div>
 
 <script>
 const canvas = document.getElementById("game");
@@ -38,18 +100,33 @@ const ctx = canvas.getContext("2d");
 
 let bird, pipes, score;
 let gravity, velocity;
-let running = true;
+let running = false;
+
+/* 🧠 SKIN (FIXED — NO IMAGE BUG) */
+const skins = {
+    "Tungtung Sahur": "🧠💀"
+};
+
+let equipped = "Tungtung Sahur";
 
 /* RESET */
 function reset() {
-    bird = { x: 100, y: 200 };
+    bird = { x: 90, y: 250 };
     pipes = [];
     score = 0;
-    gravity = 0.5;
+    gravity = 0.45;
     velocity = 0;
     running = true;
 
-    document.getElementById("ui").innerText = "Score: 0";
+    document.getElementById("score").innerText = "Score: 0";
+}
+
+/* START */
+function startGame() {
+    document.getElementById("menu").style.display = "none";
+    document.getElementById("gameOver").style.display = "none";
+    reset();
+    loop();
 }
 
 /* INPUT */
@@ -60,8 +137,8 @@ document.addEventListener("click", () => {
 /* PIPE */
 function spawnPipe() {
     const gap = 150;
-    const top = Math.random() * 300 + 100;
-    pipes.push({ x: 500, top, gap, passed: false });
+    const top = Math.random() * 280 + 120;
+    pipes.push({ x: 420, top, gap, passed: false });
 }
 
 /* UPDATE */
@@ -69,53 +146,51 @@ function update() {
     velocity += gravity;
     bird.y += velocity;
 
-    if (pipes.length === 0 || pipes[pipes.length - 1].x < 250) {
+    if (pipes.length === 0 || pipes[pipes.length - 1].x < 200) {
         spawnPipe();
     }
 
     pipes.forEach(p => {
-        p.x -= 3;
+        p.x -= 2.8;
 
         if (!p.passed && p.x < bird.x) {
             score++;
             p.passed = true;
-            document.getElementById("ui").innerText = "Score: " + score;
+            document.getElementById("score").innerText = "Score: " + score;
         }
 
         // collision
         if (
             bird.x < p.x + 60 &&
-            bird.x + 20 > p.x &&
+            bird.x + 25 > p.x &&
             (bird.y < p.top || bird.y > p.top + p.gap)
         ) {
-            running = false;
+            endGame();
         }
     });
 
     pipes = pipes.filter(p => p.x > -100);
 
     if (bird.y > 700 || bird.y < 0) {
-        running = false;
+        endGame();
     }
 }
 
 /* DRAW */
 function draw() {
-    ctx.fillStyle = "#12002b";
-    ctx.fillRect(0, 0, 500, 700);
+    ctx.fillStyle = "#0a001a";
+    ctx.fillRect(0, 0, 420, 700);
 
-    // bird
-    ctx.fillStyle = "white";
-    ctx.beginPath();
-    ctx.arc(bird.x, bird.y, 10, 0, Math.PI * 2);
-    ctx.fill();
-
-    // pipes
-    ctx.fillStyle = "lime";
+    /* pipes */
+    ctx.fillStyle = "#00ffff";
     pipes.forEach(p => {
         ctx.fillRect(p.x, 0, 60, p.top);
         ctx.fillRect(p.x, p.top + p.gap, 60, 700);
     });
+
+    /* bird (FIXED SKIN) */
+    ctx.font = "34px Arial";
+    ctx.fillText(skins[equipped], bird.x, bird.y);
 }
 
 /* LOOP */
@@ -126,9 +201,12 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-/* START */
-reset();
-loop();
+/* GAME OVER */
+function endGame() {
+    running = false;
+    document.getElementById("finalScore").innerText = "Score: " + score;
+    document.getElementById("gameOver").style.display = "flex";
+}
 </script>
 
 </body>
